@@ -1,5 +1,5 @@
 require 'sinatra'
-require 'sinatra/reloader'
+require "sinatra/reloader" if development?
 require 'sinatra/content_for'
 require 'tilt/erubis'
 
@@ -8,32 +8,63 @@ configure do
   set :session_secret, 'secret'
 end
 
-before do
-  session[:lists] ||= []
+helpers do
+  def list_complete?(list)
+    todos_count(list) > 0 && todos_remaining_count(list) == 0
+  end
+
+  def list_class(list)
+    "complete" if list_complete?(list)
+  end
+
+  def todos_count(list)
+    list[:todos].size
+  end
+
+  def todos_remaining_count(list)
+    list[:todos].select { |todo| !todo[:completed] }.size
+  end
+
+  def sort_lists(lists, &block)
+    complete_lists, incomplete_lists = lists.partition { |list| list_complete?(list) }
+
+    incomplete_lists.each { |list| yield list, lists.index(list) }
+    complete_lists.each { |list| yield list, lists.index(list) }
+  end
+
+  def sort_todos(todos, &block)
+    complete_todos, incomplete_todos = todos.partition { |todo| todo[:completed] }
+
+    incomplete_todos.each { |todo| yield todo, todos.index(todo) }
+    complete_todos.each { |todo| yield todo, todos.index(todo) }
+  end
 end
 
-helpers do
-  # Return an error message if name is invalid, otherwise return nil.
-  def list_error(name)
-    if !(1..100).cover? name.size
-      'The list name must be between 1 and 100 characters.'
-    elsif session[:lists].any? { |list| list[:name] == name }
-      'List name must be unique.'
-    end
-  end
-
-  # Return an error message if name is invalid, otherwise return nil.
-  def todo_error(name)
-    if !(1..100).cover? name.size
-      'Todo must be between 1 and 100 characters.'
-    end
-  end
+before do
+  session[:lists] ||= []
 end
 
 # GET /lists        -> view all lists
 # GET /lists/new    -> new list form
 # POST /lists       -> create new list
 # GET /lists/:id    -> view a single list
+
+# Return an error message if name is invalid, otherwise return nil.
+def list_error(name)
+  if !(1..100).cover? name.size
+    'The list name must be between 1 and 100 characters.'
+  elsif session[:lists].any? { |list| list[:name] == name }
+    'List name must be unique.'
+  end
+end
+
+# Return an error message if name is invalid, otherwise return nil.
+def todo_error(name)
+  if !(1..100).cover? name.size
+    'Todo must be between 1 and 100 characters.'
+  end
+end
+
 
 get '/' do
   redirect '/lists'
