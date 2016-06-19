@@ -29,8 +29,8 @@ helpers do
   def sort_lists(lists, &block)
     complete_lists, incomplete_lists = lists.partition { |list| list_complete?(list) }
 
-    incomplete_lists.each { |list| yield list, lists.index(list) }
-    complete_lists.each { |list| yield list, lists.index(list) }
+    incomplete_lists.each(&block)
+    complete_lists.each(&block)
   end
 
   def sort_todos(todos, &block)
@@ -67,16 +67,17 @@ def todo_error(name)
 end
 
 # Load the specified list and handle errors appropriately
-def load_list(index)
-  list = session[:lists][index] if index
+def load_list(id)
+  list = session[:lists].find { | list| list[:id] = id}
   return list if list
 
   session[:error] = "The specified list was not found."
   redirect '/lists'
+  halt
 end
 
-def next_todo_id(todos)
-  max = todos.map { |todo| todo[:id] }.max || 0
+def next_element_id(elements)
+  max = elements.map { |todo| todo[:id] }.max || 0
   max + 1
 end
 
@@ -100,7 +101,8 @@ post '/lists' do
     session[:error] = error
     erb :new_list, layout: :layout
   else
-    session[:lists] << { name: list_name, todos: [] }
+    id = next_element_id(session[:lists])
+    session[:lists] << { id: id, name: list_name, todos: [] }
     session[:success] = 'The list has been created.'
     redirect '/lists'
   end
@@ -144,11 +146,11 @@ end
 # Delete an existing todo list.
 post '/lists/:id/destroy' do
   id = params[:id].to_i
-  session[:lists].delete_at(id)
+  session[:lists].reject! { |list| list[:id] == id }
+  session[:success] = "The list has been deleted."
   if env["HTTP_X_REQUESTED_WITH"] == "XMLHttpRequest"
     "/lists"
   else
-    session[:success] = "The list has been deleted."
     redirect '/lists'
   end
 end
@@ -165,7 +167,7 @@ post '/lists/:list_id/todos' do
     session[:error] = error
     erb :list, layout: :layout
   else
-    id = next_todo_id(@list[:todos])
+    id = next_element_id(@list[:todos])
     @list[:todos] << { id: id, name: text, completed: false }
     session[:success] = "The todo was added."
     redirect "/lists/#{@list_id}"
