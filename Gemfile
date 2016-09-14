@@ -7,6 +7,7 @@ gem 'sinatra-contrib'
 gem 'erubis'
 gem 'pg'
 gem 'sequel'
+gem 'pry'
 
 group :production do
   gem 'puma'
